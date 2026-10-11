@@ -142,3 +142,10 @@ Possible next steps: multi-source comparisons, SQLite history, background jobs, 
 Deploy the project root as the FastAPI framework, with no custom Build Command or Output Directory. Vercel discovers `app/main.py`; `vercel.json` configures its function duration. Do not use the old custom Python handler or route overrides. All application routes, including `/docs`, `/research/export/pdf`, and `/reports/pdf`, are handled by FastAPI.
 
 Set `GEMINI_API_KEY` and `GEMINI_MODEL=gemini-3.5-flash` in Vercel Project Settings > Environment Variables for Production (and Preview if needed). Local `.env` is excluded from deployments. After changing environment variables or uploading updated code, create a new deployment. Verify `/health` returns `{"status":"ok"}`, then try demo mode before live research. If the backend fails, open the deployment's Runtime Logs and inspect the error for `/research`; browser messages include the HTTP status without revealing internal error bodies.
+
+
+### Fix `ModuleNotFoundError: No module named app`
+
+The deployed root must contain `main.py`, `pyproject.toml`, `vercel.json`, `requirements.txt`, the entire `app/` folder (including `__init__.py`, `main.py`, `pdf_report.py`, and `index.html`), and `examples/`. The root `main.py` imports the actual application from `app.main`. Do not deploy the contents of `app/` as the project root or move its files out of that folder.
+
+In Vercel Settings > Build and Deployment, set Root Directory to the repository directory containing `requirements.txt` and `vercel.json`, not `app`. Choose FastAPI and clear custom Build Command and Output Directory overrides. Upload or push the complete updated project, then create a new deployment. Set Gemini credentials in Vercel Environment Variables; the deployment archive excludes local secrets.
