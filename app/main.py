@@ -161,6 +161,10 @@ def run_research(request):
         raise HTTPException(504, "Website request timed out")
     except httpx.HTTPError:
         raise HTTPException(502, "Could not connect to the website")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Internal server error: {str(e)}")
 
 
 @app.get("/health")

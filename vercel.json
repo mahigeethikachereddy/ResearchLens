@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "functions": {
+    "api/research.py": {
+      "runtime": "python3.11",
+      "maxDuration": 60
+    }
+  },
+  "routes": [
+    {
+      "src": "/research",
+      "dest": "api/research.py"
+    },
+    {
+      "src": "/reports/pdf",
+      "dest": "api/research.py"
+    },
+    {
+      "src": "/health",
+      "dest": "api/research.py"
+    },
+    {
+      "src": "/",
+      "dest": "api/research.py"
+    }
+  ]
+}
