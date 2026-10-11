@@ -1,6 +1,6 @@
 # ResearchLens — AI-Powered Web Research & Report Generator
 
-A portfolio project that turns a permitted HTTPS page into extracted evidence, a focused Gemini summary, and CSV or formatted HTML reports. Includes a browser interface and interactive FastAPI documentation.
+A portfolio project that turns a permitted HTTPS page into extracted evidence, a focused Gemini summary, and PDF, CSV or formatted HTML reports. Includes a browser interface and interactive FastAPI documentation.
 
 ## Quick start
 
@@ -60,6 +60,10 @@ The FastAPI endpoint validates a request and public HTTPS hostname, checks publi
 - `tests/test_app.py`: mocked workflow and safety tests
 - `.env.example`: environment configuration
 
+## Formal reports and PDF downloads
+
+Live research uses formal academic sections and aims for 1000-1500 words when the evidence supports it. Reports remain single-source AI-assisted analyses, not original research. The interface uses larger reading text and section headings. Download PDF produces an A4 report with source metadata, references, page numbers and an evidence appendix. POST `/reports/pdf` renders an existing research result without fetching or generating again; POST `/research/export/pdf` generates a new result. Install updated requirements before starting the app.
+
 ## REST API
 
 | Method | Path | Result |
@@ -88,7 +92,7 @@ curl -X POST http://127.0.0.1:8000/research/export/html \
   -o research-report.html
 ```
 
-Open an HTML report in a browser and use Print → Save as PDF. Direct PDF export is not implemented. Each export endpoint runs a fresh research request; use browser downloads to reuse one result.
+Open an HTML report in a browser and use Print → Save as PDF. Direct PDF export is available through the Download PDF button; it reuses the displayed result without another Gemini request. Each export endpoint runs a fresh research request; use browser downloads to reuse one result.
 
 ## Error handling
 

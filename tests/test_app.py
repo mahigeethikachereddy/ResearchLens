@@ -22,7 +22,7 @@ def test_demo_and_downloads(monkeypatch):
     rows = list(csv.reader(io.StringIO(exported.text.lstrip('\ufeff'))))
     assert len(rows) == 2 and rows[1][0] == result.json()["title"]
     assert client.post("/research/export/html", json=BODY).status_code == 200
-    assert client.post("/research/export/pdf", json=BODY).status_code == 400
+    assert client.post("/research/export/unknown", json=BODY).status_code == 400
 
 
 def test_auth(monkeypatch):
@@ -137,3 +137,24 @@ def test_private_addresses_blocked(address):
         with pytest.raises(HTTPException) as error:
             validate_url("https://example.com")
     assert error.value.status_code == 403
+
+
+def test_pdf_reuses_existing_report(monkeypatch):
+    monkeypatch.delenv("RESEARCH_API_KEY", raising=False)
+    result = client.post("/research", json=BODY).json()
+    with patch("app.main.summarize", side_effect=AssertionError("No additional AI call")):
+        response = client.post("/reports/pdf", json=result)
+    assert response.status_code == 200
+    assert response.content.startswith(b"%PDF-")
+    assert response.headers["content-type"] == "application/pdf"
+    assert 'research-report.pdf' in response.headers['content-disposition']
+    assert client.post("/research/export/pdf", json=BODY).content.startswith(b"%PDF-")
+
+
+def test_pdf_auth_and_size(monkeypatch):
+    monkeypatch.delenv("RESEARCH_API_KEY", raising=False)
+    result = client.post("/research", json=BODY).json()
+    monkeypatch.setenv("RESEARCH_API_KEY", "secret")
+    assert client.post("/reports/pdf", json=result).status_code == 401
+    result['summary'] = 'x' * 100001
+    assert client.post("/reports/pdf", json=result, headers={"X-API-Key": "secret"}).status_code == 413
