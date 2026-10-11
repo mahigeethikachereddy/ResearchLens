@@ -135,3 +135,10 @@ Possible next steps: multi-source comparisons, SQLite history, background jobs, 
 - FastAPI: https://fastapi.tiangolo.com/
 - BeautifulSoup: https://www.crummy.com/software/BeautifulSoup/bs4/doc/
 - n8n: https://docs.n8n.io/
+
+
+## Deploy on Vercel
+
+Deploy the project root as the FastAPI framework, with no custom Build Command or Output Directory. Vercel discovers `app/main.py`; `vercel.json` configures its function duration. Do not use the old custom Python handler or route overrides. All application routes, including `/docs`, `/research/export/pdf`, and `/reports/pdf`, are handled by FastAPI.
+
+Set `GEMINI_API_KEY` and `GEMINI_MODEL=gemini-3.5-flash` in Vercel Project Settings > Environment Variables for Production (and Preview if needed). Local `.env` is excluded from deployments. After changing environment variables or uploading updated code, create a new deployment. Verify `/health` returns `{"status":"ok"}`, then try demo mode before live research. If the backend fails, open the deployment's Runtime Logs and inspect the error for `/research`; browser messages include the HTTP status without revealing internal error bodies.
