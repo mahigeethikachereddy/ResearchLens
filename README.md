@@ -2,9 +2,25 @@
 
 A portfolio project that turns a permitted HTTPS page into extracted evidence, a focused Gemini summary, and PDF, CSV or formatted HTML reports. Includes a browser interface, interactive FastAPI documentation, and a locally tested n8n workflow for scheduled HTML report generation and storage.
 
+## Report preview
+
+![ResearchLens HTML report with source metadata, formal research sections, and extracted evidence](docs/images/n8n/generated-html-report.png)
+
+*Generated during an earlier example.com test. This preview demonstrates the report format, not a completed TechCrunch news run.*
+
+## My implementation
+
+I built ResearchLens's Python/FastAPI research and export pipeline, connected Gemini for source-based report generation, and added the browser interface and PDF downloads. I also connected four n8n nodes to call the deployed HTML export API, convert its response into a file, and save the report locally. I tested the automation end to end and investigated failures using Vercel logs and Google AI Studio's rate-limit dashboard.
+
+## Live demo and integration status
+
+[Open ResearchLens](https://research-lens-ai-research.vercel.app/)
+
+**Last documented status: 12 October 2026.** Earlier n8n tests successfully generated local HTML reports. The latest run recorded in the integration documentation failed with an upstream Gemini **503**, surfaced as **502** by ResearchLens. Continuous live availability and unattended daily execution are not confirmed. Local fictional demo mode can demonstrate the interface without calling Gemini.
+
 ## Quick start
 
-Requires Python 3.10+.
+Requires Python 3.11+ (see `pyproject.toml` for the supported version range).
 
 ```bash
 python -m venv .venv
@@ -46,7 +62,7 @@ GEMINI_MODEL=gemini-3.8-flash
 RESEARCH_API_KEY=choose-a-long-random-secret
 ```
 
-Use a model your Gemini account can access. API usage has separate billing; never commit `.env`. The default model is a configurable example, not a guarantee of account availability. Enter the endpoint key in the browser form if configured. Uncheck demo and provide an HTTPS page on any public domain. No domain allowlist is required; existing `ALLOWED_DOMAINS` settings are ignored. Private, loopback and other non-public network addresses remain blocked.
+The documented intended configuration is `gemini-3.8-flash` for both local setup and Vercel. The earlier report screenshot records `gemini-3.5-flash`, which was used for that historical test. Use a model your Gemini account can access. API usage has separate billing; never commit `.env`. The default model is a configurable example, not a guarantee of account availability. Enter the endpoint key in the browser form if configured. Uncheck demo and provide an HTTPS page on any public domain. No domain allowlist is required; existing `ALLOWED_DOMAINS` settings are ignored. Private, loopback and other non-public network addresses remain blocked.
 
 Only add sites you own or have permission to extract under their terms. robots.txt is an additional check, not proof of permission. Missing robots.txt (404) permits the fetch; other robots failures stop it. Redirects are rejected: provide the final approved URL. HTML is limited to 2 MB and extracted text to 24,000 characters, with truncation recorded. Pages requiring login or JavaScript rendering are unsupported.
 
@@ -108,87 +124,51 @@ Tests use bundled data and mocked website/AI responses, with no API costs. They 
 
 ## Workflow automation with n8n
 
-I built and tested a local n8n workflow that connects ResearchLens's deployed API to automated HTML report generation and local file storage. This extends the browser-based application with a scheduled workflow: request a report, convert the response into a file, and save it for later review.
-
-### Workflow architecture
+The FastAPI application handles webpage extraction, Gemini research, and exports. My locally tested n8n workflow automates requesting an HTML report and saving it to disk:
 
 ```text
 Schedule Trigger → HTTP Request → Convert to File → Read/Write Files from Disk
 ```
 
-1. **Schedule Trigger:** starts the workflow at the configured time. The intended daily schedule is **7:00 AM, Asia/Kolkata**. Other times were used during testing; confirm the saved schedule before relying on daily execution.
-2. **HTTP Request:** sends a JSON `POST` request to the deployed `/research/export/html` endpoint with a source URL, research focus, and `demo: false` to use live Gemini-backed research.
-3. **Convert to File:** uses **Convert to Text File** to turn the returned HTML content into a report file.
-4. **Read/Write Files from Disk:** uses **Write File to Disk** to save the HTML report locally.
-
 ![Four connected n8n nodes with green checks from a successful test execution](docs/images/n8n/workflow-success.png)
 
-*Figure 1. The implemented workflow, showing a successful test execution across all four nodes.*
+*All four nodes completed successfully in an earlier test execution.*
 
-### Local setup and request configuration
+### What I configured
 
-I ran n8n on my Mac from the terminal:
+- **Schedule Trigger:** intended daily execution at **7:00 AM, Asia/Kolkata**; other times were used for testing. Confirm the saved schedule before relying on daily runs.
+- **HTTP Request:** JSON `POST` to `https://research-lens-ai-research.vercel.app/research/export/html`, passing a source URL, research focus, and `demo: false`.
+- **Convert to File:** **Convert to Text File** converts the returned HTML into a report file.
+- **Read/Write Files from Disk:** **Write File to Disk** saves the report to `~/.n8n-files/ResearchLens/reports/researchlens-report.html`.
 
-```bash
-npx n8n
-```
+I started n8n locally with `npx n8n`. The fixed output filename overwrites the previous report after each successful run. The later request configuration targeted TechCrunch technology news, but the report preview above comes from a separate example.com format test.
 
-The documented deployment endpoint was:
+### Reproduce and review the work
 
-```text
-https://research-lens-ai-research.vercel.app/research/export/html
-```
+[Read the detailed n8n integration documentation](docs/n8n/ResearchLens_n8n_Integration_Documentation.pdf) for the request body, node configuration, screenshots, test results, and troubleshooting history. An importable workflow JSON is not included in this repository.
 
-The technology-news request was configured as follows:
+Use your own reachable API endpoint and writable output directory. If the backend enables `RESEARCH_API_KEY`, send `X-API-Key` through an n8n credential. The documented test configuration did not use that custom header. Keep Gemini credentials in the backend environment and credentials out of workflow exports and Git commits.
 
-```json
-{
-  "url": "https://techcrunch.com/",
-  "focus": "Summarize the latest technology industry news, major company announcements, product launches, startup funding, and emerging trends. Include headlines and dates when available. Explain why each development matters and its potential industry impact. Use only information supported by the webpage; do not invent facts.",
-  "demo": false
-}
-```
+Local scheduled runs depend on n8n remaining running and the computer being awake and connected. Gemini service errors can interrupt generation. This workflow demonstrates HTML storage; it does not automate the application's PDF download feature.
 
-The tested node setup did not include a custom authentication header. If `RESEARCH_API_KEY` is enabled on a deployment, configure an n8n credential to send `X-API-Key`. The Gemini key stays in the backend environment; it is not part of this request body.
+### Troubleshooting evidence
 
-The local output path used during testing was:
+<details>
+<summary>Vercel logs, Gemini usage, and remaining improvements</summary>
 
-```text
-~/.n8n-files/ResearchLens/reports/researchlens-report.html
-```
+I checked the model environment setting and redeployed while investigating the latest failure. The documentation records `gemini-3.8-flash` returning upstream HTTP 503; the API returned HTTP 502 to n8n. This identifies the failing upstream step without establishing an invalid API key or proving quota exhaustion caused the error.
 
-The fixed filename means subsequent successful runs overwrite the previous report. Anyone reproducing the workflow should use their own endpoint and a writable output directory. This README documents the implementation; an importable workflow JSON is not included here.
+![Vercel log showing HTTP 502 at the HTML export endpoint](docs/images/n8n/vercel-error-log.png)
 
-### Generated report and validation
+*The screenshot shows the application's 502 response; the accompanying documentation records the upstream Gemini 503.*
 
-Earlier tests completed the workflow and generated local HTML report files. The example below shows the exported report's title, source URL, retrieval and model metadata, formal research sections, and extracted evidence.
+![Historical Google AI Studio rate-limit dashboard](docs/images/n8n/gemini-rate-limits.png)
 
-![Generated ResearchLens HTML report for the example.com format test](docs/images/n8n/generated-html-report.png)
+*Usage captured during troubleshooting. These are historical figures, not current quotas or proof of the failure's cause.*
 
-*Figure 2. An example.com output-format test, with gemini-3.5-flash recorded in its metadata. This demonstrates the report output; it does not establish that the later TechCrunch news request completed successfully.*
+Next improvements include bounded retries with backoff, failure notifications, dated report filenames, and an always-on n8n host. These are future work, not completed features.
 
-### Troubleshooting and documented status
-
-**As documented on 12 October 2026:** the workflow was assembled and successfully executed in earlier tests, and HTML reports were saved locally. A later run failed: ResearchLens returned **HTTP 502** to n8n, while the upstream Gemini request returned **HTTP 503 Service Unavailable** for `gemini-3.8-flash`. Unattended daily reliability has not yet been confirmed.
-
-I investigated the failure using Vercel request logs and the Google AI Studio rate-limit dashboard, and checked the deployed model configuration. The recorded 503 indicates an upstream availability failure at that time; it does not establish an invalid API key or prove that quota exhaustion caused that request to fail.
-
-![Vercel request log showing HTTP 502 for the ResearchLens HTML export endpoint](docs/images/n8n/vercel-error-log.png)
-
-*Figure 3. The Vercel screenshot shows the application's 502 response. The accompanying implementation notes record the upstream Gemini 503; that detail is not fully visible in this screenshot.*
-
-![Google AI Studio dashboard showing model usage captured during troubleshooting](docs/images/n8n/gemini-rate-limits.png)
-
-*Figure 4. A historical quota snapshot captured during troubleshooting. These figures are time-specific, not current limits or proof of the cause of the 503.*
-
-### Operational limits and next improvements
-
-- Local scheduling requires n8n to remain running and the Mac to be awake and connected. This setup is not an always-on hosted automation service.
-- The workflow currently saves HTML. The application's separate PDF download feature is not demonstrated by this n8n workflow.
-- Future improvements include bounded retries with backoff for transient failures, failure notifications, dated filenames for report history, and a continuously running n8n deployment.
-- Credentials should stay in backend environment variables or n8n credentials, outside screenshots, workflow exports, and Git commits.
-
-This work demonstrates scheduled workflow design, REST API integration, response-to-file conversion, local report storage, end-to-end testing, and investigation of upstream AI service failures.
+</details>
 
 ## Portfolio demonstration
 
@@ -214,7 +194,7 @@ Possible next steps: multi-source comparisons, SQLite history, background jobs, 
 
 Deploy the project root as the FastAPI framework, with no custom Build Command or Output Directory. Vercel discovers `app/main.py`; `vercel.json` configures its function duration. Do not use the old custom Python handler or route overrides. All application routes, including `/docs`, `/research/export/pdf`, and `/reports/pdf`, are handled by FastAPI.
 
-Set `GEMINI_API_KEY` and `GEMINI_MODEL=gemini-3.5-flash` in Vercel Project Settings > Environment Variables for Production (and Preview if needed). Local `.env` is excluded from deployments. After changing environment variables or uploading updated code, create a new deployment. Verify `/health` returns `{"status":"ok"}`, then try demo mode before live research. If the backend fails, open the deployment's Runtime Logs and inspect the error for `/research`; browser messages include the HTTP status without revealing internal error bodies.
+Set `GEMINI_API_KEY` and `GEMINI_MODEL=gemini-3.8-flash` in Vercel Project Settings > Environment Variables for Production (and Preview if needed). Local `.env` is excluded from deployments. After changing environment variables or uploading updated code, create a new deployment. Verify `/health` returns `{"status":"ok"}`, then try demo mode before live research. If the backend fails, open the deployment's Runtime Logs and inspect the error for `/research`; browser messages include the HTTP status without revealing internal error bodies.
 
 
 ### Fix `ModuleNotFoundError: No module named app`
