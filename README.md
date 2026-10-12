@@ -1,6 +1,6 @@
 # ResearchLens — AI-Powered Web Research & Report Generator
 
-A portfolio project that turns a permitted HTTPS page into extracted evidence, a focused Gemini summary, and PDF, CSV or formatted HTML reports. Includes a browser interface and interactive FastAPI documentation.
+A portfolio project that turns a permitted HTTPS page into extracted evidence, a focused Gemini summary, and PDF, CSV or formatted HTML reports. Includes a browser interface, interactive FastAPI documentation, and a locally tested n8n workflow for scheduled HTML report generation and storage.
 
 ## Quick start
 
@@ -106,16 +106,89 @@ python -m pytest -q
 
 Tests use bundled data and mocked website/AI responses, with no API costs. They cover extraction, truncation, authentication, DNS checks, robots restrictions, redirects, report escaping, exports and the AI adapter. Live website/Gemini integration requires your network, permission and API credentials.
 
-## Optional n8n scheduling
+## Workflow automation with n8n
 
-1. Add a Schedule Trigger and choose your interval.
-2. Connect an HTTP Request node: POST to your reachable `/research/export/html` endpoint.
-3. Set JSON body to `{"url":"https://your-permitted-domain.com/page","focus":"Latest findings","demo":false}`.
-4. Add `X-API-Key` through an n8n credential, not an embedded secret.
-5. Set the response format to File and connect your preferred storage node.
-6. Test manually, configure failure notifications and activate the workflow.
+I built and tested a local n8n workflow that connects ResearchLens's deployed API to automated HTML report generation and local file storage. This extends the browser-based application with a scheduled workflow: request a report, convert the response into a file, and save it for later review.
 
-If n8n runs in Docker, `localhost` refers to its container, not your computer. Use a reachable backend address; `host.docker.internal` is available in many Docker Desktop setups. Scheduling repeats extraction and model billing on each run. This package provides instructions, not an activated n8n workflow.
+### Workflow architecture
+
+```text
+Schedule Trigger → HTTP Request → Convert to File → Read/Write Files from Disk
+```
+
+1. **Schedule Trigger:** starts the workflow at the configured time. The intended daily schedule is **7:00 AM, Asia/Kolkata**. Other times were used during testing; confirm the saved schedule before relying on daily execution.
+2. **HTTP Request:** sends a JSON `POST` request to the deployed `/research/export/html` endpoint with a source URL, research focus, and `demo: false` to use live Gemini-backed research.
+3. **Convert to File:** uses **Convert to Text File** to turn the returned HTML content into a report file.
+4. **Read/Write Files from Disk:** uses **Write File to Disk** to save the HTML report locally.
+
+![Four connected n8n nodes with green checks from a successful test execution](docs/images/n8n/workflow-success.png)
+
+*Figure 1. The implemented workflow, showing a successful test execution across all four nodes.*
+
+### Local setup and request configuration
+
+I ran n8n on my Mac from the terminal:
+
+```bash
+npx n8n
+```
+
+The documented deployment endpoint was:
+
+```text
+https://research-lens-ai-research.vercel.app/research/export/html
+```
+
+The technology-news request was configured as follows:
+
+```json
+{
+  "url": "https://techcrunch.com/",
+  "focus": "Summarize the latest technology industry news, major company announcements, product launches, startup funding, and emerging trends. Include headlines and dates when available. Explain why each development matters and its potential industry impact. Use only information supported by the webpage; do not invent facts.",
+  "demo": false
+}
+```
+
+The tested node setup did not include a custom authentication header. If `RESEARCH_API_KEY` is enabled on a deployment, configure an n8n credential to send `X-API-Key`. The Gemini key stays in the backend environment; it is not part of this request body.
+
+The local output path used during testing was:
+
+```text
+~/.n8n-files/ResearchLens/reports/researchlens-report.html
+```
+
+The fixed filename means subsequent successful runs overwrite the previous report. Anyone reproducing the workflow should use their own endpoint and a writable output directory. This README documents the implementation; an importable workflow JSON is not included here.
+
+### Generated report and validation
+
+Earlier tests completed the workflow and generated local HTML report files. The example below shows the exported report's title, source URL, retrieval and model metadata, formal research sections, and extracted evidence.
+
+![Generated ResearchLens HTML report for the example.com format test](docs/images/n8n/generated-html-report.png)
+
+*Figure 2. An example.com output-format test, with gemini-3.5-flash recorded in its metadata. This demonstrates the report output; it does not establish that the later TechCrunch news request completed successfully.*
+
+### Troubleshooting and documented status
+
+**As documented on 12 October 2026:** the workflow was assembled and successfully executed in earlier tests, and HTML reports were saved locally. A later run failed: ResearchLens returned **HTTP 502** to n8n, while the upstream Gemini request returned **HTTP 503 Service Unavailable** for `gemini-3.8-flash`. Unattended daily reliability has not yet been confirmed.
+
+I investigated the failure using Vercel request logs and the Google AI Studio rate-limit dashboard, and checked the deployed model configuration. The recorded 503 indicates an upstream availability failure at that time; it does not establish an invalid API key or prove that quota exhaustion caused that request to fail.
+
+![Vercel request log showing HTTP 502 for the ResearchLens HTML export endpoint](docs/images/n8n/vercel-error-log.png)
+
+*Figure 3. The Vercel screenshot shows the application's 502 response. The accompanying implementation notes record the upstream Gemini 503; that detail is not fully visible in this screenshot.*
+
+![Google AI Studio dashboard showing model usage captured during troubleshooting](docs/images/n8n/gemini-rate-limits.png)
+
+*Figure 4. A historical quota snapshot captured during troubleshooting. These figures are time-specific, not current limits or proof of the cause of the 503.*
+
+### Operational limits and next improvements
+
+- Local scheduling requires n8n to remain running and the Mac to be awake and connected. This setup is not an always-on hosted automation service.
+- The workflow currently saves HTML. The application's separate PDF download feature is not demonstrated by this n8n workflow.
+- Future improvements include bounded retries with backoff for transient failures, failure notifications, dated filenames for report history, and a continuously running n8n deployment.
+- Credentials should stay in backend environment variables or n8n credentials, outside screenshots, workflow exports, and Git commits.
+
+This work demonstrates scheduled workflow design, REST API integration, response-to-file conversion, local report storage, end-to-end testing, and investigation of upstream AI service failures.
 
 ## Portfolio demonstration
 
